@@ -23,6 +23,18 @@ class Projects(dict):
             print(f'Projects.INIT at {resp.headers["Date"]}: {resp.headers["Status"]}')
 
 
+class CustomAttr:
+    def __init__(self, **kwargs):
+        if kwargs.get('custom_fields'):
+            pass
+        else:
+            self.id = kwargs.get('id')
+            self.name = kwargs.get('name')
+            self.value = kwargs.get('value')
+
+    def __repr__(self):
+        return f'(CustomAttr: id:{self.id}; name:{self.name}; value:{self.value})'
+
 class Project:
     def __init__(self, **kwargs):
         self.id = kwargs.get('id')
@@ -30,8 +42,11 @@ class Project:
         self.identifier = kwargs.get('identifier')
         self.description = kwargs.get('description')
         self.status = kwargs.get('status')
-        self.custom_fields = kwargs.get('custom_fields')
+        self.custom_fields = {i['name']: CustomAttr(id=i['id'],
+                                                    name=i['name'],
+                                                    value=i['value'])
+                              for i in kwargs.get('custom_fields')}
 
 
 test = Projects()
-print(test)
+print(test['mortgage'].custom_fields)
