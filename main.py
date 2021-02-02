@@ -1,14 +1,28 @@
 import requests as req
 from config import Config
 from requests.auth import HTTPBasicAuth
+import pandas as pd
+
+
+def send_request(**kwargs):
+    resp = req.get(url=Config.REDMINE_URL + '/projects.json?limit=500',
+                   auth=HTTPBasicAuth(Config.LOGIN, Config.PASSWORD)
+                   # , params=kwargs.get('params')
+                   )
+    if resp.status_code == 200:
+        return resp
+    else:
+        print(
+            f'Error: send_request to {kwargs.get("url")} at {resp.headers["Date"]}: {resp.headers["Status"]}. {resp.text}')
 
 
 class Projects(dict):
     def __init__(self):
         super().__init__()
-        resp = req.get(Config.REDMINE_URL+'/projects.json?limit=500', auth=HTTPBasicAuth(Config.LOGIN, Config.PASSWORD))
+        resp = send_request(url=Config.REDMINE_URL + '/projects.json?limit=500')
+        # print(f'debug type={type(resp)}')
         # TODO перенести классы по логированию
-        if resp.status_code == 200:
+        if resp:
             for pr in resp.json()['projects']:
                 if list(filter(lambda x: x['name'] == 'Redmine Api' and x['value'] == '1', pr['custom_fields'])):
                     self[pr['identifier']] = Project(id=pr['id'],
@@ -18,8 +32,6 @@ class Projects(dict):
                                                      status=pr['status'],
                                                      custom_fields=pr['custom_fields']
                                                      )
-        else:
-            print(f'Projects.INIT at {resp.headers["Date"]}: {resp.headers["Status"]}')
 
 
 class CustomAttr:
@@ -56,7 +68,7 @@ class Project:
                f'   identifier: {self.identifier}\n'
 
     def get_users(self):
-        resp = req.get(Config.REDMINE_URL+f'/projects/{self.id}/memberships.json',
+        resp = req.get(Config.REDMINE_URL + f'/projects/{self.id}/memberships.json',
                        auth=HTTPBasicAuth(Config.LOGIN, Config.PASSWORD))
         for i in resp.json()['memberships']:
             try:
@@ -70,13 +82,14 @@ class Project:
 class User:
     def __init__(self, **kwargs):
         self.id = kwargs.get('id')
-        if kwargs.get('login') and kwargs.get('firstname') and kwargs.get('lastname') and kwargs.get('mail'):  # если данные уже пришли, то заполняем
+        if kwargs.get('login') and kwargs.get('firstname') and kwargs.get('lastname') and kwargs.get(
+                'mail'):  # если данные уже пришли, то заполняем
             self.login = kwargs.get('login')
             self.firstname = kwargs.get('firstname')
             self.lastname = kwargs.get('lastname')
             self.mail = kwargs.get('mail')
-        else:   # вызываем сервис
-            resp = req.get(Config.REDMINE_URL+f'/users.json',
+        else:  # вызываем сервис
+            resp = req.get(Config.REDMINE_URL + f'/users.json',
                            auth=HTTPBasicAuth(Config.LOGIN, Config.PASSWORD),
                            params={'name': kwargs.get('name'),
                                    'status': '1'}
@@ -90,7 +103,7 @@ class User:
         return f'User: {self.firstname} {self.lastname} ({self.login})'
 
     def get_open_tasks(self):
-        resp = req.get(Config.REDMINE_URL+f'/issues.json',
+        resp = req.get(Config.REDMINE_URL + f'/issues.json',
                        auth=HTTPBasicAuth(Config.LOGIN, Config.PASSWORD),
                        params={'assigned_to_id': self.id}
                        )
@@ -117,6 +130,16 @@ class User:
                                        closed_on=i.get('closed_on')
                                        )
 
+    def get_data_frame(self):
+        data = [[i.id, i.project, i.tracker, i.status, i.priority, i.author, i.assigned_to, i.parent, i.subject,
+                 i.description, i.start_date, i.due_date, i.done_ratio, i.is_private, i.estimated_hours,
+                 i.custom_fields,
+                 i.created_on, i.updated_on, i.closed_on] for i in self.tasks.values()]
+        entries = ['id', 'project', 'tracker', 'status', 'priority', 'author', 'assigned_to', 'parent', 'subject',
+                   'description', 'start_date', 'due_date', 'done_ratio', 'is_private', 'estimated_hours',
+                   'custom_fields', 'created_on', 'updated_on', 'closed_on']
+        return pd.DataFrame(data=data, columns=entries)
+
 
 class Task:
     def __init__(self, **kwargs):
@@ -137,19 +160,26 @@ class Task:
         self.is_private = kwargs.get('is_private')
         self.estimated_hours = kwargs.get('estimated_hours')
         self.custom_fields = kwargs.get('custom_fields')
+        self.created_on = kwargs.get('created_on')
+        self.updated_on = kwargs.get('updated_on')
+        self.closed_on = kwargs.get('closed_on')
 
     def __repr__(self):
         # print(f'debug repr id = {self.id}')
         return f'Task #{self.id}: subject: {self.subject}'
 
+
 test = Projects()
 test['mortgage'].get_users()
 cur = test['mortgage'].users['i.konkin']
+cur.get_open_tasks()
 """
 :type cur: User
 """
-cur.get_open_tasks()
 print(cur.tasks)
+df = cur.get_data_frame()
+# df = pd.DataFrame.from_dict(cur.tasks, orient='index')
+print(df.head(5))
 
 # test['mortgage'].get_users()
 # print(User(name='i.konkin'))
