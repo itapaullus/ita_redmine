@@ -110,13 +110,13 @@ class User:
         self.tasks = {}
         for i in resp.json()['issues']:
             self.tasks[i['id']] = Task(id=i['id'],
-                                       project=i.get('project'),
-                                       tracker=i.get('tracker'),
-                                       status=i.get('status'),
-                                       priority=i.get('priority'),
-                                       author=i.get('author'),
-                                       assigned_to=i.get('assigned_to'),
-                                       parent=i.get('parent'),
+                                       project=i.get('project', {}),
+                                       tracker=i.get('tracker', {}),
+                                       status=i.get('status', {}),
+                                       priority=i.get('priority', {}),
+                                       author=i.get('author', {}),
+                                       assigned_to=i.get('assigned_to', {}),
+                                       parent=i.get('parent', {}),
                                        subject=i.get('subject'),
                                        description=i.get('description'),
                                        start_date=i.get('start_date'),
@@ -131,10 +131,12 @@ class User:
                                        )
 
     def get_data_frame(self):
-        data = [[i.id, i.project, i.tracker, i.status, i.priority, i.author, i.assigned_to, i.parent, i.subject,
+        data = [[i.id, i.project.get('name'), i.tracker.get('name'), i.status.get('name'), i.priority.get('name'), i.author.get('name'),
+                 i.assigned_to.get('name'), i.parent.get('id'), i.subject,
                  i.description, i.start_date, i.due_date, i.done_ratio, i.is_private, i.estimated_hours,
                  i.custom_fields,
                  i.created_on, i.updated_on, i.closed_on] for i in self.tasks.values()]
+        # print(data)
         entries = ['id', 'project', 'tracker', 'status', 'priority', 'author', 'assigned_to', 'parent', 'subject',
                    'description', 'start_date', 'due_date', 'done_ratio', 'is_private', 'estimated_hours',
                    'custom_fields', 'created_on', 'updated_on', 'closed_on']
@@ -176,10 +178,12 @@ cur.get_open_tasks()
 """
 :type cur: User
 """
+
+
 print(cur.tasks)
 df = cur.get_data_frame()
-# df = pd.DataFrame.from_dict(cur.tasks, orient='index')
-print(df.head(5))
-
-# test['mortgage'].get_users()
-# print(User(name='i.konkin'))
+print(df.info())
+# print(df['tracker'])
+pr = df.loc[:, ['tracker', 'start_date', 'updated_on']]
+print(pr)
+print(pr[pr['start_date'] < pr['updated_on']]['tracker'].count())
